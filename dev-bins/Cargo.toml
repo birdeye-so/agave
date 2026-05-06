@@ -6,6 +6,7 @@ members = [
     "../svm-test-harness",
     "../svm-test-harness/fixture",
     "../svm-test-harness/instr",
+    "../ledger-accounts-stream/"
 ]
 
 resolver = "2"
