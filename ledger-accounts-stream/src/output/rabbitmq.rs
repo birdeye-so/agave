@@ -28,10 +28,15 @@ impl AccountOutput for RabbitMqOutput {
         Ok(())
     }
 
-    fn write_account(&mut self, pubkey: &Pubkey, cli_account: &CliAccount) -> Result<(), String> {
-        // TODO: serialize cli_account as byte buffer and publish to self.exchange
+    fn write_account(
+        &mut self,
+        pubkey: &Pubkey,
+        cli_account: &CliAccount,
+        slot: u64,
+    ) -> Result<(), String> {
+        // TODO: serialize cli_account and slot as byte buffer and publish to self.exchange
         //       using pubkey.to_string() as the routing key
-        let _ = (pubkey, cli_account);
+        let _ = (pubkey, cli_account, slot);
         Ok(())
     }
 

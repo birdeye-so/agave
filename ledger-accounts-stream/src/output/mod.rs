@@ -11,13 +11,21 @@ use {
 pub mod jetstream;
 pub mod rabbitmq;
 pub mod std_out;
+pub mod utils;
+
+pub use jetstream::JetStreamOutput;
 
 /// Implemented by each output destination (stdout, RabbitMQ, JetStream, …).
 /// The streamer calls `begin` once, then `write_account` for every matching
 /// account, then `end` with the final stats.
 pub trait AccountOutput {
     fn begin(&mut self) -> Result<(), String>;
-    fn write_account(&mut self, pubkey: &Pubkey, cli_account: &CliAccount) -> Result<(), String>;
+    fn write_account(
+        &mut self,
+        pubkey: &Pubkey,
+        cli_account: &CliAccount,
+        slot: u64,
+    ) -> Result<(), String>;
     fn end(&mut self, stats: &TotalAccountsStats) -> Result<(), String>;
 }
 
@@ -62,7 +70,11 @@ pub struct AccountsOutputStreamer {
 }
 
 impl AccountsOutputStreamer {
-    pub fn new(bank: Arc<Bank>, config: AccountsOutputConfig, output: Box<dyn AccountOutput>) -> Self {
+    pub fn new(
+        bank: Arc<Bank>,
+        config: AccountsOutputConfig,
+        output: Box<dyn AccountOutput>,
+    ) -> Self {
         Self {
             bank,
             config,
@@ -72,8 +84,7 @@ impl AccountsOutputStreamer {
 
     fn is_included(&self, account: &AccountSharedData) -> bool {
         account.is_loadable()
-            && (self.config.include_sysvars
-                || !solana_sdk_ids::sysvar::check_id(account.owner()))
+            && (self.config.include_sysvars || !solana_sdk_ids::sysvar::check_id(account.owner()))
     }
 
     /// Accumulates stats and, when `output_config` is set, forwards the
@@ -82,6 +93,7 @@ impl AccountsOutputStreamer {
         &self,
         pubkey: &Pubkey,
         account: &AccountSharedData,
+        slot: u64,
         stats: &mut TotalAccountsStats,
     ) {
         stats.accumulate_account(account);
@@ -89,7 +101,7 @@ impl AccountsOutputStreamer {
             let cli_account = CliAccount::new_with_config(pubkey, account, cfg);
             self.output
                 .borrow_mut()
-                .write_account(pubkey, &cli_account)
+                .write_account(pubkey, &cli_account, slot)
                 .unwrap();
         }
     }
@@ -102,10 +114,10 @@ impl AccountsOutputStreamer {
             AccountsOutputMode::All => {
                 self.bank
                     .scan_all_accounts(|account_tuple| {
-                        if let Some((pubkey, account, _slot)) =
+                        if let Some((pubkey, account, slot)) =
                             account_tuple.filter(|(_, account, _)| self.is_included(account))
                         {
-                            self.emit_account(pubkey, &account, &mut stats);
+                            self.emit_account(pubkey, &account, slot, &mut stats);
                         }
                     })
                     .map_err(|err| format!("scan error: {err}"))?;
@@ -113,12 +125,12 @@ impl AccountsOutputStreamer {
 
             AccountsOutputMode::Individual(pubkeys) => {
                 for pubkey in pubkeys {
-                    if let Some((account, _slot)) = self
+                    if let Some((account, slot)) = self
                         .bank
                         .get_account_modified_slot_with_fixed_root(pubkey)
                         .filter(|(account, _)| self.is_included(account))
                     {
-                        self.emit_account(pubkey, &account, &mut stats);
+                        self.emit_account(pubkey, &account, slot, &mut stats);
                     }
                 }
             }
@@ -131,7 +143,12 @@ impl AccountsOutputStreamer {
                     .iter()
                     .filter(|(_, account)| self.is_included(account))
                 {
-                    self.emit_account(pubkey, account, &mut stats);
+                    let slot = self
+                        .bank
+                        .get_account_modified_slot_with_fixed_root(pubkey)
+                        .map(|(_, slot)| slot)
+                        .unwrap_or(0);
+                    self.emit_account(pubkey, account, slot, &mut stats);
                 }
             }
         }

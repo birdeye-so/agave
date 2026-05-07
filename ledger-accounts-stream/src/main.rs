@@ -5,7 +5,7 @@ use {
         App, AppSettings, Arg, SubCommand, crate_description, crate_name, value_t, value_t_or_exit,
     },
     log::*,
-    solana_clap_utils::input_validators::{is_parsable, is_pubkey, is_slot, is_within_range},
+    solana_clap_utils::input_validators::{is_parsable, is_pubkey, is_within_range},
     solana_core::{resource_limits::adjust_nofile_limit, validator::BlockVerificationMethod},
     solana_measure::measure::Measure,
     solana_unified_scheduler_pool::DefaultSchedulerPool,
@@ -210,6 +210,44 @@ fn main() {
                         .validator(is_pubkey)
                         .conflicts_with("account")
                         .help("Limit output to accounts owned by the provided program pubkey"),
+                )
+                .arg(
+                    Arg::with_name("nats_url")
+                        .long("nats-url")
+                        .takes_value(true)
+                        .value_name("URL")
+                        .help("NATS server URL"),
+                )
+                .arg(
+                    Arg::with_name("nats_stream")
+                        .long("nats-stream")
+                        .takes_value(true)
+                        .value_name("STREAM")
+                        .help("NATS JetStream stream name"),
+                )
+                .arg(
+                    Arg::with_name("nats_subject")
+                        .long("nats-subject")
+                        .takes_value(true)
+                        .value_name("SUBJECT")
+                        .default_value("solana.accounts")
+                        .help("NATS JetStream subject prefix"),
+                )
+                .arg(
+                    Arg::with_name("nats_partitions")
+                        .long("nats-partitions")
+                        .takes_value(true)
+                        .value_name("NUMBER")
+                        .validator(is_parsable::<usize>)
+                        .default_value("10")
+                        .help("Number of partitions for JetStream"),
+                )
+                .arg(
+                    Arg::with_name("nats_token")
+                        .long("nats-token")
+                        .takes_value(true)
+                        .value_name("TOKEN")
+                        .help("NATS authentication token"),
                 ),
         )
         .program_subcommand()
@@ -236,7 +274,7 @@ fn main() {
 
     match matches.subcommand() {
         ("program", Some(arg_matches)) => program(&ledger_path, arg_matches),
-        ("acocunts", Some(arg_matches)) => accounts(&ledger_path, arg_matches),
+        ("accounts", Some(arg_matches)) => accounts(&ledger_path, arg_matches),
         _ => unreachable!(),
     };
     measure_total_execution_time.stop();

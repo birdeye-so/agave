@@ -1,4 +1,4 @@
-use clap::ArgMatches;
+use clap::{ArgMatches, value_t_or_exit};
 use log::*;
 use solana_clap_utils::input_parsers::{pubkey_of, pubkeys_of};
 use solana_cli_output::OutputFormat;
@@ -12,8 +12,11 @@ use crate::{
         LoadAndProcessLedgerOutput, get_access_type, load_and_process_ledger_or_exit,
         open_blockstore, open_genesis_config_by,
     },
-    output::{AccountOutput, AccountsOutputConfig, AccountsOutputMode, AccountsOutputStreamer},
     output::std_out::StdOutOutput,
+    output::{
+        AccountOutput, AccountsOutputConfig, AccountsOutputMode, AccountsOutputStreamer,
+        JetStreamOutput,
+    },
 };
 
 pub fn accounts(path: &Path, arg_matches: &ArgMatches<'_>) {
@@ -52,8 +55,22 @@ pub fn accounts(path: &Path, arg_matches: &ArgMatches<'_>) {
         output_config,
         include_sysvars,
     };
-    let output_format = OutputFormat::from_matches(arg_matches, "output_format", false);
-    let output: Box<dyn AccountOutput> = Box::new(StdOutOutput::new(output_format));
+
+    let output: Box<dyn AccountOutput> = if let Some(url) = arg_matches.value_of("nats_url") {
+        let stream = arg_matches.value_of("nats_stream").unwrap_or("solana");
+        let subject = arg_matches
+            .value_of("nats_subject")
+            .unwrap_or("solana.accounts");
+        let token = arg_matches.value_of("nats_token").map(|s| s.to_string());
+        let partitions = value_t_or_exit!(arg_matches, "nats_partitions", usize);
+        Box::new(JetStreamOutput::new(
+            url, stream, subject, token, partitions,
+        ))
+    } else {
+        let output_format = OutputFormat::from_matches(arg_matches, "output_format", false);
+        Box::new(StdOutOutput::new(output_format))
+    };
+
     let accounts_streamer = AccountsOutputStreamer::new(bank, config, output);
     let (_, scan_time) = measure_time!(
         accounts_streamer

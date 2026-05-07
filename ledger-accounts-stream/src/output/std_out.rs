@@ -28,18 +28,31 @@ impl AccountOutput for StdOutOutput {
         Ok(())
     }
 
-    fn write_account(&mut self, _pubkey: &Pubkey, cli_account: &CliAccount) -> Result<(), String> {
+    fn write_account(
+        &mut self,
+        _pubkey: &Pubkey,
+        cli_account: &CliAccount,
+        slot: u64,
+    ) -> Result<(), String> {
         match self.format {
             OutputFormat::Json | OutputFormat::JsonCompact => {
                 if !self.is_first_account {
                     print!(",");
                 }
                 self.is_first_account = false;
-                let json = serde_json::to_string(cli_account)
+                #[derive(serde::Serialize)]
+                struct CliAccountWithSlot<'a> {
+                    #[serde(flatten)]
+                    cli_account: &'a CliAccount,
+                    slot: u64,
+                }
+                let account_with_slot = CliAccountWithSlot { cli_account, slot };
+                let json = serde_json::to_string(&account_with_slot)
                     .map_err(|e| format!("serialization error: {e}"))?;
                 print!("{json}");
             }
             _ => {
+                println!("Slot: {slot}");
                 print!("{cli_account}");
                 let account_data = cli_account.keyed_account.account.data.decode();
                 if let Some(data) = account_data {
