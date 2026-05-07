@@ -1,5 +1,6 @@
 use {
     async_nats::jetstream,
+    borsh::{BorshDeserialize, BorshSerialize},
     crossbeam_channel::{Sender, unbounded},
     serde::{Deserialize, Serialize},
     solana_cli_output::CliAccount,
@@ -10,7 +11,7 @@ use {
 
 use super::{AccountOutput, TotalAccountsStats, utils::get_partition};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub struct RawAccount {
     pub pubkey: String,
     pub lamports: u64,
@@ -110,7 +111,7 @@ impl AccountOutput for JetStreamOutput {
 
                 while let Ok(Some((pubkey, account))) = rx.recv() {
                     let partition = get_partition(&pubkey, num_partitions);
-                    let data = bincode::serialize(&account).unwrap();
+                    let data = borsh::to_vec(&account).unwrap();
 
                     // Push to partitioned subject: solana.accounts.partition.1
                     let partition_subject = format!("{}.partition.{}", subject_prefix, partition);
