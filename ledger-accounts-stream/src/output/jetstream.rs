@@ -12,14 +12,19 @@ use {
 use super::{AccountOutput, TotalAccountsStats, utils::get_partition};
 
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone, Debug)]
-pub struct RawAccount {
-    pub pubkey: String,
+pub struct KeyedAccount {
+    pub pubkey: Pubkey,
+    pub account: Account,
+    pub slot: u64,
+}
+
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone, Debug)]
+pub struct Account {
     pub lamports: u64,
-    pub owner: String,
+    pub owner: Pubkey,
     pub executable: bool,
     pub rent_epoch: u64,
     pub data: Vec<u8>,
-    pub slot: u64,
 }
 
 pub struct JetStreamOutput {
@@ -28,7 +33,7 @@ pub struct JetStreamOutput {
     pub subject: String,
     pub token: Option<String>,
     pub num_partitions: usize,
-    sender: Option<Sender<Option<(Pubkey, RawAccount)>>>,
+    sender: Option<Sender<Option<(Pubkey, KeyedAccount)>>>,
     thread: Option<JoinHandle<()>>,
 }
 
@@ -54,7 +59,7 @@ impl JetStreamOutput {
 
 impl AccountOutput for JetStreamOutput {
     fn begin(&mut self) -> Result<(), String> {
-        let (tx, rx) = unbounded::<Option<(Pubkey, RawAccount)>>();
+        let (tx, rx) = unbounded::<Option<(Pubkey, KeyedAccount)>>();
         let url = self.url.clone();
         let stream_name = self.stream.clone();
         let subject_prefix = self.subject.clone();
@@ -83,7 +88,6 @@ impl AccountOutput for JetStreamOutput {
                 );
                 let js = jetstream::new(client);
 
-                // Ensure the stream exists
                 let stream_subject = format!("{}.>", subject_prefix);
                 match js.get_stream(&stream_name).await {
                     Ok(_) => {
@@ -113,13 +117,11 @@ impl AccountOutput for JetStreamOutput {
                     let partition = get_partition(&pubkey, num_partitions);
                     let data = borsh::to_vec(&account).unwrap();
 
-                    // Push to partitioned subject: solana.accounts.partition.1
                     let partition_subject = format!("{}.partition.{}", subject_prefix, partition);
                     if let Err(e) = js.publish(partition_subject, data.clone().into()).await {
                         eprintln!("Failed to publish to JetStream: {}", e);
                     }
 
-                    // Push to all subject: solana.accounts.all
                     let all_subject = format!("{}.all", subject_prefix);
                     if let Err(e) = js.publish(all_subject, data.into()).await {
                         eprintln!("Failed to publish to JetStream (all): {}", e);
@@ -146,17 +148,28 @@ impl AccountOutput for JetStreamOutput {
                 .data
                 .decode()
                 .unwrap_or_default();
-            let raw_account = RawAccount {
-                pubkey: pubkey.to_string(),
-                lamports: cli_account.keyed_account.account.lamports,
-                owner: cli_account.keyed_account.account.owner.clone(),
-                executable: cli_account.keyed_account.account.executable,
-                rent_epoch: cli_account.keyed_account.account.rent_epoch,
-                data,
+
+            let owner = cli_account
+                .keyed_account
+                .account
+                .owner
+                .parse::<Pubkey>()
+                .map_err(|e| e.to_string())?;
+
+            let keyed_account = KeyedAccount {
+                pubkey: *pubkey,
+                account: Account {
+                    lamports: cli_account.keyed_account.account.lamports,
+                    owner,
+                    executable: cli_account.keyed_account.account.executable,
+                    rent_epoch: cli_account.keyed_account.account.rent_epoch,
+                    data,
+                },
                 slot,
             };
+
             sender
-                .send(Some((*pubkey, raw_account)))
+                .send(Some((*pubkey, keyed_account)))
                 .map_err(|e| e.to_string())?;
         }
         Ok(())
