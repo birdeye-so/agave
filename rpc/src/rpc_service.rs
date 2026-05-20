@@ -2,6 +2,7 @@
 
 use {
     crate::{
+        bank_manager::BankManager,
         cluster_tpu_info::ClusterTpuInfo,
         max_slots::MaxSlots,
         optimistically_confirmed_bank_tracker::OptimisticallyConfirmedBank,
@@ -470,6 +471,7 @@ fn process_rest(bank_forks: &Arc<RwLock<BankForks>>, path: &str) -> RequestMiddl
 /// `client_option`.
 pub struct JsonRpcServiceConfig<'a> {
     pub rpc_addr: SocketAddr,
+    pub grpc_addr: Option<SocketAddr>,
     pub rpc_config: JsonRpcConfig,
     pub snapshot_config: Option<SnapshotConfig>,
     pub bank_forks: Arc<RwLock<BankForks>>,
@@ -533,6 +535,7 @@ impl JsonRpcService {
 
         let json_rpc_service = Self::new(
             config.rpc_addr,
+            config.grpc_addr,
             config.rpc_config.clone(),
             config.snapshot_config,
             config.bank_forks.clone(),
@@ -566,6 +569,7 @@ impl JsonRpcService {
             + 'static,
     >(
         rpc_addr: SocketAddr,
+        grpc_addr: Option<SocketAddr>,
         config: JsonRpcConfig,
         snapshot_config: Option<SnapshotConfig>,
         bank_forks: Arc<RwLock<BankForks>>,
@@ -689,6 +693,8 @@ impl JsonRpcService {
         #[cfg(test)]
         let test_request_processor = request_processor.clone();
 
+        let bank_manager = BankManager::new(request_processor.clone());
+
         let ledger_path = ledger_path.to_path_buf();
 
         let (close_handle_sender, close_handle_receiver) = unbounded();
@@ -759,8 +765,30 @@ impl JsonRpcService {
             .register_exit(Box::new(move || {
                 close_handle_.close();
             }));
+
+        let combined_hdl = match grpc_addr {
+            None => thread_hdl,
+            Some(grpc_addr) => {
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+
+                let grpc_handler = runtime.spawn(async move {
+                    grpc::server::start_server(grpc_addr, Arc::new(bank_manager))
+                        .await
+                        .expect("grpc server failed")
+                });
+
+                std::thread::spawn(move || {
+                    thread_hdl.join().unwrap();
+                    runtime.block_on(grpc_handler).unwrap();
+                })
+            }
+        };
+
         Ok(Self {
-            thread_hdl,
+            thread_hdl: combined_hdl,
             #[cfg(test)]
             request_processor: test_request_processor,
             close_handle: Some(close_handle),
@@ -885,6 +913,7 @@ mod tests {
         );
         let mut rpc_service = JsonRpcService::new(
             rpc_addr,
+            None,
             json_rpc_config,
             None,
             bank_forks,

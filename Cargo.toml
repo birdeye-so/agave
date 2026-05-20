@@ -39,6 +39,7 @@ members = [
     "genesis-utils",
     "geyser-plugin-interface",
     "geyser-plugin-manager",
+    "grpc",
     "gossip",
     "gossip-cli",
     "install",
@@ -285,6 +286,7 @@ getrandom = "0.3.4"
 goauth = "0.13.1"
 governor = "0.6.3"
 group = "0.13.0"
+grpc = { path = "grpc", features = ["account-v1"]}
 hex = "0.4.3"
 hex-literal = "1.1.0"
 hidapi = { version = "2.6.4", default-features = false }
