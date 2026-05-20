@@ -265,7 +265,7 @@ impl JsonRpcRequestProcessor {
 }
 
 impl JsonRpcRequestProcessor {
-    fn get_bank_with_config(&self, config: RpcContextConfig) -> Result<Arc<Bank>> {
+    pub fn get_bank_with_config(&self, config: RpcContextConfig) -> Result<Arc<Bank>> {
         let RpcContextConfig {
             commitment,
             min_context_slot,

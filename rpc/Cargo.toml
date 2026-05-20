@@ -31,6 +31,7 @@ bincode = { workspace = true }
 bs58 = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
+grpc = { workspace = true }
 itertools = { workspace = true }
 jsonrpc-core = { workspace = true }
 jsonrpc-core-client = { workspace = true }

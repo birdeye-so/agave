@@ -509,6 +509,10 @@ pub fn execute(
         bind_addresses.active()
     };
 
+    let grpc_bind_address = matches
+        .value_of("grpc_bind_address")
+        .map(|v| solana_net_utils::parse_host_port(v).expect("invalid grpc_bind_address"));
+
     let contact_debug_interval = value_t_or_exit!(matches, "contact_debug_interval", u64);
 
     let account_indexes = AccountSecondaryIndexes::from_clap_arg_match(matches)?;
@@ -818,6 +822,7 @@ pub fn execute(
                 // https://github.com/solana-labs/solana/issues/12250
             )
         }),
+        grpc_addr: grpc_bind_address,
         pubsub_config: run_args.pub_sub_config,
         voting_disabled: matches.is_present("no_voting") || restricted_repair_only_mode,
         wait_for_supermajority: value_t!(matches, "wait_for_supermajority", Slot).ok(),

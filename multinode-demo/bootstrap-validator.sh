@@ -139,6 +139,7 @@ args+=(
   --identity "$identity"
   --vote-account "$vote_account"
   --rpc-faucet-address 127.0.0.1:9900
+  --grpc-bind-address 127.0.0.1:9999
   --no-poh-speed-test
   --no-os-network-limits-test
   --no-wait-for-vote-to-start-leader

@@ -1,0 +1,24 @@
+version: v2
+plugins:
+  - local: protoc-gen-prost
+    out: src/pb
+    opt:
+      - compile_well_known_types
+      - extern_path=.google.protobuf=::pbjson_types
+      - file_descriptor_set
+      - enable_type_names
+  - local: protoc-gen-prost-serde
+    out: src/pb
+  - local: protoc-gen-tonic
+    out: src/pb
+    opt:
+      - compile_well_known_types
+      - extern_path=.google.protobuf=::pbjson_types
+  - local: protoc-gen-prost-crate
+    out: .
+    strategy: all
+    opt:
+      - include_file=src/pb/mod.rs
+      - gen_crate
+inputs:
+  - directory: proto
