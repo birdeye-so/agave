@@ -25,7 +25,7 @@ use {
         accounts_db::{
             AccountsDb, AccountsDbConfig, AccountsFileId, AtomicAccountsFileId, IndexGenerationInfo,
         },
-        accounts_file::{AccountsFile, StorageAccess},
+        accounts_file::AccountsFile,
         accounts_hash::AccountsLtHash,
         accounts_update_notifier_interface::AccountsUpdateNotifier,
         blockhash_queue::BlockhashQueue,
@@ -57,12 +57,16 @@ use {
     },
     storage::SerializableStorage,
     types::{SerdeAccountsLtHash, UnusedRentCollector},
-    wincode::{SchemaReadOwned, SchemaWrite, io::std_write::WriteAdapter},
+    wincode::{
+        SchemaReadOwned, SchemaWrite,
+        io::{Reader, std_write::WriteAdapter},
+    },
 };
 
 mod obsolete_accounts;
 mod status_cache;
 mod storage;
+mod storages_list;
 mod tests;
 mod types;
 mod utils;
@@ -71,6 +75,7 @@ pub(crate) use {
     obsolete_accounts::{SerdeObsoleteAccounts, SerdeObsoleteAccountsMap},
     status_cache::{deserialize_status_cache, serialize_status_cache},
     storage::{SerializableAccountStorageEntry, SerializedAccountsFileId},
+    storages_list::{StorageListItem, StoragesList},
 };
 
 const MAX_STREAM_SIZE: usize = 32 * 1024 * 1024 * 1024;
@@ -383,12 +388,12 @@ where
     wincode::config::serialize_into(WriteAdapter::new(writer), value, MaxStreamSizeConfig::new())
 }
 
-pub(crate) fn deserialize_wincode_from<R, T>(reader: R) -> wincode::ReadResult<T>
+pub(crate) fn deserialize_wincode_from<'a, R, T>(reader: R) -> wincode::ReadResult<T>
 where
-    R: Read,
+    R: Reader<'a>,
     T: SchemaReadOwned<MaxStreamSizeConfig, Dst = T>,
 {
-    wincode::config::deserialize_from(io::BufReader::new(reader), MaxStreamSizeConfig::new())
+    wincode::config::deserialize_from(reader, MaxStreamSizeConfig::new())
 }
 
 pub(crate) fn deserialize_from<R, T>(reader: R) -> bincode::Result<T>
@@ -864,7 +869,6 @@ pub(crate) fn reconstruct_single_storage(
     append_vec_file_info: FileInfo,
     current_len: usize,
     id: AccountsFileId,
-    storage_access: StorageAccess,
     obsolete_accounts: Option<(ObsoleteAccounts, AccountsFileId, usize)>,
 ) -> Result<Arc<AccountStorageEntry>, SnapshotError> {
     // When restoring from an archive, obsolete accounts will always be `None`
@@ -884,8 +888,7 @@ pub(crate) fn reconstruct_single_storage(
         (current_len, ObsoleteAccounts::default())
     };
 
-    let accounts_file =
-        AccountsFile::new_for_startup(append_vec_file_info, current_len, storage_access)?;
+    let accounts_file = AccountsFile::new_for_startup(append_vec_file_info, current_len)?;
     Ok(Arc::new(AccountStorageEntry::new_existing(
         *slot,
         id,
@@ -983,7 +986,6 @@ pub(crate) fn remap_and_reconstruct_single_storage(
     append_vec_file_info: FileInfo,
     next_append_vec_id: &AtomicAccountsFileId,
     num_collisions: &AtomicUsize,
-    storage_access: StorageAccess,
 ) -> Result<Arc<AccountStorageEntry>, SnapshotError> {
     let (remapped_append_vec_id, remapped_append_vec_file_info) = remap_append_vec_file(
         slot,
@@ -997,7 +999,6 @@ pub(crate) fn remap_and_reconstruct_single_storage(
         remapped_append_vec_file_info,
         current_len,
         remapped_append_vec_id,
-        storage_access,
         None,
     )?;
     Ok(storage)

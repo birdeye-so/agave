@@ -19,7 +19,6 @@ name = "solana_runtime"
 [features]
 agave-unstable-api = []
 dev-context-only-utils = [
-    "agave-feature-set/dev-context-only-utils",
     "agave-votor-messages/dev-context-only-utils",
     "solana-accounts-db/dev-context-only-utils",
     "solana-program-binaries",
@@ -179,7 +178,6 @@ spl-generic-token = { workspace = true }
 static_assertions = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 strum_macros = { workspace = true }
-symlink = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 wincode = { workspace = true }

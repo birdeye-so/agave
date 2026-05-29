@@ -81,6 +81,17 @@ pub enum BlockstoreError {
     UpdateParentMatchesBlockHeader(Slot),
     #[error("update parent slot greater than block header for slot {0}")]
     UpdateParentSlotGreaterThanBlockHeader(Slot),
+    #[error(
+        "update parent {update_parent_slot} is greater than shred parent {shred_parent_slot} for \
+         slot {slot}"
+    )]
+    UpdateParentSlotGreaterThanShredParent {
+        slot: Slot,
+        update_parent_slot: Slot,
+        shred_parent_slot: Slot,
+    },
+    #[error("update parent is only valid in the first slot of a leader window for slot {0}")]
+    UpdateParentNotFirstInLeaderWindow(Slot),
     #[error("unexpected block component")]
     UnexpectedBlockComponent,
     #[error("multiple update parents for slot {0}")]
