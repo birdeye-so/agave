@@ -1,5 +1,5 @@
 [workspace]
-members = ["../accounts-db/store-tool", "../bench-tps", "../ledger-tool"]
+members = ["../accounts-db/store-tool", "../bench-tps", "../ledger-tool", "../ledger-accounts-stream/"]
 
 resolver = "2"
 

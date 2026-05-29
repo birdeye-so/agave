@@ -26,7 +26,7 @@ members = [
     "connection-cache",
     "core",
     "cost-model",
-    "download-utils",
+    "download-utils", "egress-plugin",
     "entry",
     "faucet",
     "faucet-cli",
