@@ -4,7 +4,7 @@
 export RUST_BACKTRACE=1
 export RUST_LOG=solana=info
 
-export MALLOC_CONF="prof:true,lg_prof_interval:32,lg_prof_sample:17,prof_prefix:jeprof"
+export MALLOC_CONF="prof:true,lg_prof_interval:32,lg_prof_sample:17,prof_prefix:/tmp/agave/jeprof"
 
 cargo build --profile release-with-debug --bin solana-validator --features jemallocator/profiling
 
